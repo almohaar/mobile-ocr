@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },
@@ -34,7 +34,12 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "react-native-fast-tflite"
+      [
+        "react-native-fast-tflite",
+        {
+          "enableAndroidGpuLibraries": ["libOpenCL-pixel.so", "libGLES_mali.so"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

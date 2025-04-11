@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   Alert,
   View,
+  ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Camera } from "expo-camera";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Tflite from "react-native-fast-tflite"; // provides our hook: useTensorflowModel
+// import { loadTensorflowModel, useTensorflowModel } from 'react-native-fast-tflite'; // provides our hook: useTensorflowModel
 import jpeg from "jpeg-js"; // installed via npm install jpeg-js
 import { Buffer } from "buffer"; // for converting base64 to a buffer
 
@@ -47,24 +48,18 @@ const convertImageToTensor = (base64: string): Float32Array => {
   return tensor;
 };
 
-export default function HomeScreen() {
+function Home() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [prediction, setPrediction] = useState<string | null>(null);
 
   // Load the model using the hook.
   // When using a local asset, use require.
-  const modelPlugin = Tflite.useTensorflowModel(
-    require("../../assets/models/yoruba_ocr_model.tflite"),
-    {
-      onLoad: (res: any) => {
-        console.log("Model loaded successfully:", res);
-      },
-      onError: (err: any) => {
-        console.error("Error loading model:", err);
-        Alert.alert("Error", "Failed to load model.");
-      },
-    } as any
-  );
+  // const modelPlugin = useTensorflowModel(
+  //   require("../../assets/yoruba_ocr_model.tflite"),
+
+  // );
 
   // Pick an image from the gallery.
   const pickImage = async () => {
@@ -112,11 +107,11 @@ export default function HomeScreen() {
   // Process the image, run prediction, and update the UI with the result.
   const handlePrediction = async (uri: string) => {
     // Check that the model is loaded.
-    if (!modelPlugin || modelPlugin.state !== "loaded") {
-      console.error("Model is not loaded yet.");
-      Alert.alert("Error", "Model is not loaded yet.");
-      return;
-    }
+    // if (!modelPlugin || modelPlugin.state !== "loaded") {
+    //   console.error("Model is not loaded yet.");
+    //   Alert.alert("Error", "Model is not loaded yet.");
+    //   return;
+    // }
 
     try {
       // 1. Resize the image to 32x32 using expo-image-manipulator.
@@ -138,8 +133,8 @@ export default function HomeScreen() {
       // 3. Run inference. Here we’re calling the low-level .run method on the model.
       // Pass the input wrapped in an array if the API expects a list of inputs.
       // The result is typically an array corresponding to the model output(s).
-      const prediction = await modelPlugin.model.run([inputTensor]);
-      console.log("Prediction result:", prediction);
+      // const prediction = await modelPlugin.model.run([inputTensor]);
+      // console.log("Prediction result:", prediction);
 
       // Handle output. Here we assume prediction is an array of outputs and we want to show the first value.
       if (prediction && prediction.length > 0) {
@@ -153,56 +148,137 @@ export default function HomeScreen() {
     }
   };
 
+   // Clear current image and prediction – for a fresh start.
+   const handleClear = () => {
+    setImageUri(null);
+    setPrediction(null);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <TouchableOpacity style={styles.button} onPress={pickImage}>
-        <Text style={styles.buttonText}>Select Image from Gallery</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={takePhoto}>
-        <Text style={styles.buttonText}>Capture Photo</Text>
-      </TouchableOpacity>
-      {imageUri && (
-        <Image source={{ uri: imageUri }} style={styles.image} resizeMode="contain" />
-      )}
-      {result && (
-        <View style={styles.resultContainer}>
-          <Text style={styles.resultText}>{result}</Text>
+    <Text style={styles.header}>Yoruba OCR</Text>
+
+    {/* Action buttons for image selection */}
+    {!imageUri && (
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity style={styles.actionButton} onPress={pickImage}>
+          <Text style={styles.actionText}>Select Image</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={takePhoto}>
+          <Text style={styles.actionText}>Capture Photo</Text>
+        </TouchableOpacity>
+      </View>
+    )}
+
+    {/* Display image preview along with subsequent action buttons */}
+    {imageUri && (
+      <View style={styles.previewContainer}>
+        <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="contain" />
+        <View style={styles.buttonGroup}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={handleClear}>
+            <Text style={styles.buttonText}>Retake</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.primaryButton} onPress={() => handlePrediction(imageUri)}>
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Predict</Text>
+            )}
+          </TouchableOpacity>
         </View>
-      )}
-    </SafeAreaView>
+      </View>
+    )}
+
+    {/* Show prediction result */}
+    {prediction && (
+      <View style={styles.predictionContainer}>
+        <Text style={styles.predictionText}>{prediction}</Text>
+      </View>
+    )}
+  </SafeAreaView>
   );
 }
+
+export default Home
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    backgroundColor: "#F8F9FA",
     alignItems: "center",
-    backgroundColor: "#f4f4f4",
+    padding: 20,
   },
-  button: {
-    backgroundColor: "#4CAF50",
-    padding: 12,
+  header: {
+    fontSize: 28,
+    fontWeight: "700",
+    marginVertical: 20,
+    color: "#333",
+  },
+  actionsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
     marginVertical: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    width: "80%",
   },
-  buttonText: {
-    color: "#FFFFFF",
+  actionButton: {
+    backgroundColor: "#4CAF50",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 5,
+  },
+  actionText: {
+    color: "#fff",
     fontSize: 16,
   },
-  image: {
-    width: 200,
-    height: 200,
-    marginTop: 16,
+  previewContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginVertical: 20,
+  },
+  imagePreview: {
+    width: 250,
+    height: 250,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ccc",
   },
-  resultContainer: {
-    marginTop: 16,
-    paddingHorizontal: 16,
+  buttonGroup: {
+    flexDirection: "row",
+    marginTop: 15,
   },
-  resultText: {
+  primaryButton: {
+    backgroundColor: "#007BFF",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 5,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  secondaryButton: {
+    backgroundColor: "#FFC107",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginHorizontal: 5,
+    minWidth: 120,
+    alignItems: "center",
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+  predictionContainer: {
+    backgroundColor: "#e9ecef",
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 20,
+    width: "100%",
+    alignItems: "center",
+  },
+  predictionText: {
     fontSize: 18,
     color: "#333",
   },
